@@ -110,6 +110,17 @@ curl localhost:3000/health   # {"status":"ok"}
 (the Android emulator boot / build / install commands are unchanged — see
 [Android setup](#android-setup-emulator--build) below.)
 
+## Stop the demo
+
+`start-demo.sh` deliberately starts the backend/emulator with `nohup ... & disown` so they
+survive the terminal being closed (needed to avoid a `SIGTTIN`-suspend bug — see
+Troubleshooting) — which also means closing the terminal does **not** stop them. Use:
+
+```bash
+scripts/stop-demo.sh          # stops the backend + emulator
+FULL=1 scripts/stop-demo.sh   # also stops Postgres/Neo4j/Ollama
+```
+
 After `demo:reset`, `rules`/`products`/`stores`/`shelves`/`inventory`/`customers` are
 pre-seeded (mock SAP master data — see the mapping table above) but **`orders` is
 empty on purpose**, so the Customer Order Simulator → Android app flow can be shown
