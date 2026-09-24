@@ -237,26 +237,67 @@ flowing between screens, not to narrate slides:
 5. **Terminal** — `tail -f /tmp/backend.log` visible in a corner, so rule firings
    and sync requests scroll live as you interact with the app.
 
-Suggested walkthrough:
+### Concrete walkthrough (exact customers/products — copy this 1:1)
 
-1. In the **Customer Order Simulator**, create a new order for a customer/store/product.
-2. Switch to the **Android app** → tap **Refresh** in the Orders top bar → the new order
-   appears (proves the DB, not a bespoke customer app, is the shared source of truth;
-   there's no auto-refresh/pull-to-refresh by design — keep it simple, one explicit action).
-3. Open the order → scan a shelf QR code, or tap **Pick shelf (no camera)** to choose one
-   from a dropdown instead (the emulator's fake camera has no usable feed — see Known
-   simplifications; a real device's camera works fine with **Scan shelf**) → tap
-   **Picked Up** / **Is Empty** / **Is Nearly Empty**.
-4. If **Is Empty**: the app shows a suggested substitute (rule-fired, only offered because
-   the customer's `alternativeOkIfEmpty` flag is set) — flip to the **backend log tab** to show
-   the rule firing in real time, then to **Neo4j Browser** to show the underlying graph query.
-5. If stock is low: flip to the **Notifications** screen to show the store-manager notification
-   that fired from the same rule engine.
-6. In **Rules Admin**, disable the substitute-suggestion rule live, repeat step 3 on a different
-   item, and show the suggestion no longer appears — demonstrating behaviour change with zero
-   redeploy (rules are data, not code).
-7. Open the **Assistant** tab, tap record, ask "is there a similar product to X?" — shows local
-   speech-to-text → RAG-over-the-graph → LLM answer, fully offline/local.
+The Android app is hardcoded to one store (`Constants.STORE_ID` = **Downtown
+Supermarket**), so every order below must be placed against that store. The
+cast is deliberately small so two orders exercise all 4 rules:
+
+| Seed entity | Value | Why this one |
+|---|---|---|
+| Customer A | **Alice Johnson** | `alternative_ok_if_empty = true` — the one customer who *will* get a substitute suggestion. Also `last_order_at` is already >60 days ago, for the loyalty rule (see step 5). |
+| Customer B | **Bob Smith** | `alternative_ok_if_empty = false` — negative-case contrast for the same substitute rule. |
+| Product A | **Whole Milk 1L** (`QR-ST01-MILK`) | Has a curated substitute (Oat Milk 1L) *and* is stocked at both stores — one shelf report on this item fires 3 of the 4 rules at once. |
+| Product B | **White Bread Loaf** (`QR-ST01-BREAD`) | Also has a curated substitute (Whole Grain Bread Loaf) and is stocked at both stores — used with Bob to prove the substitute rule is properly gated by opt-in even though a substitute *does* exist. |
+| Store to compare against | **Uptown Supermarket** | Stocks Milk and Bread too, so cross-store availability has real data to find. |
+
+Run `demo:reset` first so `rule_firings`/notifications start empty. Then:
+
+1. **Order 1 — the "hero" order.** In the Simulator: Customer = **Alice Johnson**,
+   Store = **Downtown Supermarket**, Product = **Whole Milk 1L** only. Submit.
+2. Android app → **Refresh** on Orders → open Alice's order → **Pick shelf (no camera)**
+   → **Whole Milk 1L** → tap **Is Empty**.
+   This single tap fires 3 rules simultaneously — narrate each as it appears:
+   - **On the same screen**: "Suggested substitute (customer opted in): Oat Milk 1L" —
+     `suggest_substitute_on_empty` (gated on Alice's opt-in).
+   - **Notifications tab**: an `available_at_other_store` notification naming
+     **Uptown Supermarket** and its remaining qty — `suggest_other_store_on_empty`
+     (note: this one is *not* gated by opt-in — it fires for any customer, since telling
+     an associate where else stock exists doesn't need customer consent).
+   - **Notifications tab**: a `shelf_low_stock` manager notification for Whole Milk 1L —
+     `notify_manager_on_low_stock`.
+   - Flip to `tail -f /tmp/backend.log` to show all 3 firing in real time, then to
+     Neo4j Browser to show the `Product -[:SUBSTITUTE_FOR]-> Product` /
+     `Shelf -[:LOCATED_IN]-> Store` pattern each one matched against.
+3. **Order 2 — the contrast order.** In the Simulator: Customer = **Bob Smith**,
+   Store = **Downtown Supermarket**, Product = **White Bread Loaf** only. Submit,
+   refresh, open the order, pick the Bread shelf, tap **Is Empty**.
+   - The screen shows **"No substitute available or customer opted out."** even though
+     Whole Grain Bread Loaf *is* a real curated substitute — proves the gate is
+     evaluated per-customer, not per-product.
+   - The manager low-stock and cross-store-availability notifications still fire (same
+     as step 2) — reinforcing that those two rules don't care about customer opt-in.
+4. **Rules Admin, live behaviour change.** Disable `suggest_substitute_on_empty`, place a
+   fresh order for Alice on a still-`ok` shelf (e.g. Coffee Beans doesn't have a
+   substitute — use Milk again after resetting it to `ok`), tap **Is Empty** again, and
+   show no substitute suggestion appears this time — same code path, rule disabled as
+   pure data, zero redeploy.
+5. **Loyalty rule (the one rule with no live UI trigger).** `loyalty_addon_suggestion`
+   fires on `customers` row changes — nothing in the UI updates a customer row live today
+   (in production this would be a nightly dormant-customer batch job, not a user action).
+   Trigger it manually right before switching to Notifications:
+   ```bash
+   psql -h localhost -U "$(whoami)" -d bopis -c \
+     "UPDATE customers SET updated_at = now() WHERE id = 'c1000000-0000-0000-0000-000000000001';"
+   ```
+   Alice's `last_order_at` is already >60 days old, so this fires a `loyalty_addon`
+   notification suggesting the associate add a free Dark Chocolate Bar to her pickup.
+6. **Assistant tab (voice).** Tap record, ask **"is there a similar product to whole
+   milk?"** — callback to the same hero product from step 2. Shows: whisper.cpp
+   transcript → pgvector nearest-product match (Whole Milk 1L) → curated substitutes
+   lookup (Oat Milk 1L) → Ollama composes the sentence → Piper speaks it back, fully
+   offline. See [docs/architecture.md](docs/architecture.md#where-pgvector-is-actually-used-query-time-mapping)
+   for the full request-mapping diagram.
 
 ## Status
 
