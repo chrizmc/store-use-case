@@ -46,6 +46,9 @@ interface ApiService {
         @Body body: SubstituteRequest,
     ): OrderItem
 
+    @GET("shelves")
+    suspend fun getShelves(@Query("storeId") storeId: String): List<Shelf>
+
     @GET("shelves/{qr}")
     suspend fun getShelf(@Path("qr") qrCode: String): Shelf
 

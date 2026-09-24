@@ -201,8 +201,10 @@ Suggested walkthrough:
 2. Switch to the **Android app** → tap **Refresh** in the Orders top bar → the new order
    appears (proves the DB, not a bespoke customer app, is the shared source of truth;
    there's no auto-refresh/pull-to-refresh by design — keep it simple, one explicit action).
-3. Open the order → scan a shelf QR code (or tap through if the emulator has no camera feed)
-   → tap **Picked Up** / **Is Empty** / **Is Nearly Empty**.
+3. Open the order → scan a shelf QR code, or tap **Pick shelf (no camera)** to choose one
+   from a dropdown instead (the emulator's fake camera has no usable feed — see Known
+   simplifications; a real device's camera works fine with **Scan shelf**) → tap
+   **Picked Up** / **Is Empty** / **Is Nearly Empty**.
 4. If **Is Empty**: the app shows a suggested substitute (rule-fired, only offered because
    the customer's `alternativeOkIfEmpty` flag is set) — flip to the **backend log tab** to show
    the rule firing in real time, then to **Neo4j Browser** to show the underlying graph query.
@@ -237,6 +239,10 @@ Suggested walkthrough:
   (see [docs/architecture.md](docs/architecture.md)).
 - The Orders screen has no pull-to-refresh/auto-refresh — tap the explicit **Refresh**
   button in the top bar after creating an order elsewhere (e.g. the simulator).
+- The Android emulator's back camera has no usable feed for real QR scanning (it renders a
+  synthetic test pattern, not a live image) — use **Pick shelf (no camera)** on the
+  emulator instead, which lists the same shelves without needing the camera. **Scan shelf**
+  itself is unchanged and works as expected on a real device (e.g. the Pixel 6a).
 
 ## Troubleshooting
 

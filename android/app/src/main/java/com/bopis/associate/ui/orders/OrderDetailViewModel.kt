@@ -7,15 +7,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bopis.associate.data.BopisRepository
 import com.bopis.associate.data.remote.OrderDetail
+import com.bopis.associate.data.remote.Shelf
 import kotlinx.coroutines.launch
 
 class OrderDetailViewModel(private val repository: BopisRepository, private val orderId: String) : ViewModel() {
     var order by mutableStateOf<OrderDetail?>(null)
         private set
 
+    // Backs the manual "pick a shelf" fallback for scanning (e.g. no usable emulator camera).
+    var shelves by mutableStateOf<List<Shelf>>(emptyList())
+        private set
+
     fun load() {
         viewModelScope.launch {
-            order = repository.getOrder(orderId)
+            val loaded = repository.getOrder(orderId)
+            order = loaded
+            shelves = repository.getShelves(loaded.store_id)
         }
     }
 }

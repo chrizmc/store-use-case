@@ -47,6 +47,12 @@ class BopisRepository(
         fetch = { api.getShelf(qrCode) },
     )
 
+    // Manual fallback list for picking a shelf without scanning (see ShelfPickerDialog).
+    suspend fun getShelves(storeId: String): List<Shelf> = withCacheFallback(
+        cacheKey = "shelves:$storeId",
+        fetch = { api.getShelves(storeId) },
+    )
+
     suspend fun getSubstitutes(orderId: String, itemId: String): List<SubstituteCandidate> =
         try {
             api.getSubstitutes(orderId, itemId)

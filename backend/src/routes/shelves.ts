@@ -3,6 +3,21 @@ import { query } from '../db/pg.js';
 import { withIdempotency } from '../idempotency.js';
 
 export async function shelvesRoutes(app: FastifyInstance) {
+  // Manual fallback for the QR-scan flow (e.g. emulator with no usable camera feed) —
+  // lets the associate pick a shelf from a list instead of scanning it.
+  app.get('/shelves', async (req) => {
+    const { storeId } = req.query as { storeId?: string };
+    return query(
+      `SELECT s.*, p.name AS product_name, p.sku, i.qty, i.status AS inventory_status
+       FROM shelves s
+       JOIN products p ON p.id = s.product_id
+       JOIN inventory i ON i.shelf_id = s.id
+       WHERE $1::uuid IS NULL OR s.store_id = $1
+       ORDER BY p.name`,
+      [storeId ?? null]
+    );
+  });
+
   // Drives the QR-scan flow: one shelf holds exactly one product for demo simplicity.
   app.get('/shelves/:qr', async (req) => {
     const { qr } = req.params as { qr: string };
