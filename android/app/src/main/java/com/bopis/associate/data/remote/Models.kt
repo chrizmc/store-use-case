@@ -1,6 +1,7 @@
 package com.bopis.associate.data.remote
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class OrderSummary(
@@ -70,7 +71,9 @@ data class AppNotification(
     val id: String,
     val role: String,
     val type: String,
-    val payload: Map<String, String> = emptyMap(),
+    // JsonElement, not String: rule action payloads mix strings and numbers (e.g. qty),
+    // and a plain Map<String, String> throws on any non-string value (caused a crash).
+    val payload: Map<String, JsonElement> = emptyMap(),
     val read_at: String? = null,
 )
 

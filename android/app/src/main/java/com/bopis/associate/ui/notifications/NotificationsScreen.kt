@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.bopis.associate.data.remote.AppNotification
+import kotlinx.serialization.json.JsonPrimitive
 
 @Composable
 fun NotificationsScreen(viewModel: NotificationsViewModel) {
@@ -38,7 +39,10 @@ private fun NotificationRow(notification: AppNotification) {
         Column(modifier = Modifier.padding(16.dp)) {
             AssistChip(onClick = {}, label = { Text(notification.role) })
             Text(notification.type)
-            Text(notification.payload.entries.joinToString(", ") { "${it.key}=${it.value}" })
+            Text(notification.payload.entries.joinToString(", ") { (key, value) ->
+                val display = (value as? JsonPrimitive)?.content ?: value.toString()
+                "$key=$display"
+            })
         }
     }
 }
