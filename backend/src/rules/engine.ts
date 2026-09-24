@@ -75,4 +75,13 @@ async function runAction(
       [JSON.stringify({ entityId, ...params, ...first })]
     );
   }
+
+  if (actionType === 'suggest_other_store') {
+    const storeName = first?.storeName;
+    if (!storeName) return;
+    await query(
+      "INSERT INTO notifications (role, type, payload) VALUES ('associate', 'available_at_other_store', $1)",
+      [JSON.stringify({ shelfId: entityId, storeName, qty: first?.qty })]
+    );
+  }
 }

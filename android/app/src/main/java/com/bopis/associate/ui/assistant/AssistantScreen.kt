@@ -72,6 +72,7 @@ fun AssistantScreen(viewModel: AssistantViewModel) {
             }
             Spacer(modifier = Modifier.height(16.dp))
             if (viewModel.isBusy) CircularProgressIndicator()
+            viewModel.transcript?.let { Text("Heard: \u201c$it\u201d") }
             viewModel.answer?.let { Text(it) }
         }
     }

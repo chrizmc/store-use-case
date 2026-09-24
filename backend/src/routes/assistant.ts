@@ -10,15 +10,26 @@ import { synthesizeSpeech } from '../ai/tts.js';
 import { query } from '../db/pg.js';
 import { runCypher } from '../db/neo4j.js';
 
-// Shared by both the text and voice entry points: embeds the question, pulls similar
-// products via pgvector and store facts via Neo4j, then asks the local LLM to answer.
+// Shared by both the text and voice entry points. Vector search (pgvector) only identifies
+// *which* catalog product the question is likely about - it must NOT be presented as "the
+// answer" itself, since a question sentence's embedding vs. short product-name embeddings is
+// a fuzzy match. The curated `substitutes` table (the same one the shelf-action rule engine
+// uses) is the source of truth for what counts as an accepted alternative.
 async function answerQuestion(question: string, storeId: string) {
   const embedding = await embedText(question);
-  const similarProducts = await query(
-    `SELECT sku, name, 1 - (embedding <=> $1) AS similarity
-     FROM products ORDER BY embedding <=> $1 LIMIT 3`,
+  const [likelyProduct] = await query(
+    `SELECT id, sku, name, 1 - (embedding <=> $1) AS similarity
+     FROM products ORDER BY embedding <=> $1 LIMIT 1`,
     [JSON.stringify(embedding)]
   );
+  const substitutes = likelyProduct
+    ? await query(
+        `SELECT sp.name, sp.sku, s.score
+         FROM substitutes s JOIN products sp ON sp.id = s.substitute_product_id
+         WHERE s.product_id = $1 ORDER BY s.score DESC`,
+        [likelyProduct.id]
+      )
+    : [];
   const graphFacts = await runCypher(
     `MATCH (p:Product)-[:STOCKED_AT]->(s:Shelf)-[:LOCATED_IN]->(st:Store)
      WHERE st.id = $storeId
@@ -26,8 +37,8 @@ async function answerQuestion(question: string, storeId: string) {
     { storeId }
   );
   const graphFactsObj = graphFacts.map((r) => r.toObject());
-  const answer = await generateAnswer(question, { similarProducts, graphFacts: graphFactsObj });
-  return { answer, similarProducts, graphFacts: graphFactsObj };
+  const answer = await generateAnswer(question, { likelyProduct, substitutes, graphFacts: graphFactsObj });
+  return { answer, likelyProduct, substitutes, graphFacts: graphFactsObj };
 }
 
 export async function assistantRoutes(app: FastifyInstance) {

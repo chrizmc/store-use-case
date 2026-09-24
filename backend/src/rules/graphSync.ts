@@ -6,16 +6,22 @@ import { runCypher } from '../db/neo4j.js';
 export async function syncEntityToNeo4j(table: string, id: string) {
   if (table === 'inventory') {
     const [row] = await query(
-      `SELECT i.shelf_id, i.qty, i.status, s.qr_code, s.product_id, s.store_id
-       FROM inventory i JOIN shelves s ON s.id = i.shelf_id WHERE i.shelf_id = $1`,
+      `SELECT i.shelf_id, i.qty, i.status, s.qr_code, s.product_id, s.store_id, st.name AS store_name
+       FROM inventory i
+       JOIN shelves s ON s.id = i.shelf_id
+       JOIN stores st ON st.id = s.store_id
+       WHERE i.shelf_id = $1`,
       [id]
     );
     if (!row) return;
+    // A Store node only ever appears in the graph once one of its shelves syncs here —
+    // stores with no seeded shelves/inventory (e.g. a brand-new store) won't show up yet.
     await runCypher(
       `MERGE (s:Shelf {id: $shelfId})
        SET s.qrCode = $qrCode, s.status = $status, s.qty = $qty
        MERGE (p:Product {id: $productId})
        MERGE (st:Store {id: $storeId})
+       SET st.name = $storeName
        MERGE (p)-[:STOCKED_AT]->(s)
        MERGE (s)-[:LOCATED_IN]->(st)`,
       {
@@ -25,6 +31,7 @@ export async function syncEntityToNeo4j(table: string, id: string) {
         qty: row.qty,
         productId: row.product_id,
         storeId: row.store_id,
+        storeName: row.store_name,
       }
     );
     return;

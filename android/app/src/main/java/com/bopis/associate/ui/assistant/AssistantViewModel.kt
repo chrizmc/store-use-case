@@ -24,6 +24,10 @@ class AssistantViewModel(
     var question by mutableStateOf("")
     var answer by mutableStateOf<String?>(null)
         private set
+    // What whisper.cpp actually transcribed, shown as-is so mistranscriptions are visible
+    // (as opposed to a wrong-sounding answer that was really just a bad answer, not bad STT).
+    var transcript by mutableStateOf<String?>(null)
+        private set
     var isRecording by mutableStateOf(false)
         private set
     var isBusy by mutableStateOf(false)
@@ -35,6 +39,7 @@ class AssistantViewModel(
     fun askText() {
         val q = question
         if (q.isBlank()) return
+        transcript = null
         viewModelScope.launch {
             isBusy = true
             answer = repository.assistantQuery(q, Constants.STORE_ID).answer
@@ -44,6 +49,7 @@ class AssistantViewModel(
 
     fun startRecording() {
         isRecording = true
+        transcript = null
         recorder.start(recordingFile)
     }
 
@@ -57,6 +63,7 @@ class AssistantViewModel(
             )
             val storeIdPart = Constants.STORE_ID.toRequestBody("text/plain".toMediaType())
             val response = repository.assistantVoice(audioPart, storeIdPart)
+            transcript = response.question
             question = response.question ?: question
             answer = response.answer
             response.audioBase64?.let { playAnswerAudio(it) }

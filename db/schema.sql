@@ -141,6 +141,9 @@ CREATE TRIGGER trg_notifications_notify AFTER INSERT OR UPDATE ON notifications
 CREATE TABLE rules (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text UNIQUE NOT NULL,
+  -- Plain-English explanation shown in the Rules Admin UI, kept separate from
+  -- the Cypher query so non-technical readers can understand what a rule does.
+  description text,
   trigger_table text NOT NULL,
   cypher_query text NOT NULL,
   action_type text NOT NULL,

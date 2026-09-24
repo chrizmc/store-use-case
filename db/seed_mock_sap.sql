@@ -33,6 +33,21 @@ INSERT INTO inventory (shelf_id, qty, status) VALUES
   ('b1000000-0000-0000-0000-000000000004', 3, 'low'),
   ('b1000000-0000-0000-0000-000000000005', 15, 'ok');
 
+-- Second store's shelves/inventory (Mock: SAP ATP for Uptown Supermarket, ST02).
+-- Seeded so the "check other stores" rule has real cross-store data to reason
+-- over during the demo (e.g. Coffee Beans is stocked here even if ST01 runs out).
+INSERT INTO shelves (id, store_id, product_id, qr_code, aisle) VALUES
+  ('b2000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'a1000000-0000-0000-0000-000000000001', 'QR-ST02-MILK', 'Aisle 1'),
+  ('b2000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'a1000000-0000-0000-0000-000000000003', 'QR-ST02-BREAD', 'Aisle 2'),
+  ('b2000000-0000-0000-0000-000000000003', '22222222-2222-2222-2222-222222222222', 'a1000000-0000-0000-0000-000000000005', 'QR-ST02-COFFEE', 'Aisle 3'),
+  ('b2000000-0000-0000-0000-000000000004', '22222222-2222-2222-2222-222222222222', 'a1000000-0000-0000-0000-000000000006', 'QR-ST02-CHOCOLATE', 'Aisle 4');
+
+INSERT INTO inventory (shelf_id, qty, status) VALUES
+  ('b2000000-0000-0000-0000-000000000001', 10, 'ok'),
+  ('b2000000-0000-0000-0000-000000000002', 6, 'ok'),
+  ('b2000000-0000-0000-0000-000000000003', 18, 'ok'),
+  ('b2000000-0000-0000-0000-000000000004', 9, 'ok');
+
 -- Mock: SAP Customer Data Cloud / Customer Profile --------------------------
 INSERT INTO customers (id, name, alternative_ok_if_empty, last_order_at) VALUES
   ('c1000000-0000-0000-0000-000000000001', 'Alice Johnson', true, now() - interval '90 days'),

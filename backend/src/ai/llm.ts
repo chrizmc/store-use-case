@@ -1,6 +1,8 @@
-// Local Ollama generation, combining structured graph facts with vector similarity hits (RAG).
+// Local Ollama generation, combining structured graph facts with the curated substitutes table (RAG).
 export async function generateAnswer(question: string, context: Record<string, unknown>): Promise<string> {
-  const prompt = `Answer the store associate's question using only the context below.\n\nQuestion: ${question}\n\nContext: ${JSON.stringify(
+  const prompt = `Answer the store associate's question using only the context below. "substitutes" is
+the store's confirmed list of accepted alternatives for "likelyProduct" - if it is empty, say
+there is no known alternative rather than guessing one.\n\nQuestion: ${question}\n\nContext: ${JSON.stringify(
     context
   )}\n\nAnswer concisely:`;
 

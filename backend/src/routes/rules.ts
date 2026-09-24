@@ -7,8 +7,9 @@ export async function rulesRoutes(app: FastifyInstance) {
   app.get('/rules', async () => query('SELECT * FROM rules ORDER BY name'));
 
   app.post('/rules', async (req) => {
-    const { name, triggerTable, cypherQuery, actionType, actionParams, enabled } = req.body as {
+    const { name, description, triggerTable, cypherQuery, actionType, actionParams, enabled } = req.body as {
       name: string;
+      description?: string;
       triggerTable: string;
       cypherQuery: string;
       actionType: string;
@@ -16,9 +17,9 @@ export async function rulesRoutes(app: FastifyInstance) {
       enabled?: boolean;
     };
     const [rule] = await query(
-      `INSERT INTO rules (name, trigger_table, cypher_query, action_type, action_params, enabled)
-       VALUES ($1, $2, $3, $4, $5, COALESCE($6, true)) RETURNING *`,
-      [name, triggerTable, cypherQuery, actionType, actionParams, enabled ?? null]
+      `INSERT INTO rules (name, description, trigger_table, cypher_query, action_type, action_params, enabled)
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, true)) RETURNING *`,
+      [name, description ?? null, triggerTable, cypherQuery, actionType, actionParams, enabled ?? null]
     );
     return rule;
   });
