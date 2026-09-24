@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Customer Order Simulator</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    label { display: block; margin-top: 14px; font-weight: 600; font-size: 0.9em; }
+    select { width: 100%; padding: 6px; }
+    fieldset { border: 1px solid #ddd; border-radius: 6px; margin-top: 8px; }
+    .item { font-weight: normal; display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+    button { margin-top: 16px; padding: 8px 16px; }
+    #result { margin-top: 16px; white-space: pre-wrap; background: #f5f5f5; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 0.85em; }
+    a { color: #06c; }
+  </style>
+</head>
+<body>
+  <p><a href="/index.html">&larr; back</a></p>
+  <h1>Customer Order Simulator</h1>
+  <p>There is no separate customer-facing app &mdash; this simulates a customer placing a BOPIS order so the
+     associate app has something to pick.</p>
+
+  <form id="orderForm">
+    <label>Customer<select name="customerId" id="customerSelect" required></select></label>
+    <label>Store<select name="storeId" id="storeSelect" required></select></label>
+    <label>Products
+      <fieldset id="productList"></fieldset>
+    </label>
+    <button type="submit">Place order</button>
+  </form>
+  <div id="result"></div>
+
+  <script>
+    async function loadOptions() {
+      const [customers, stores, products] = await Promise.all([
+        fetch('/customers').then((r) => r.json()),
+        fetch('/stores').then((r) => r.json()),
+        fetch('/products').then((r) => r.json()),
+      ]);
+      const customerSelect = document.getElementById('customerSelect');
+      customerSelect.innerHTML = customers.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+      const storeSelect = document.getElementById('storeSelect');
+      storeSelect.innerHTML = stores.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
+      const productList = document.getElementById('productList');
+      productList.innerHTML = products
+        .map(
+          (p) => `<label class="item"><input type="checkbox" name="productIds" value="${p.id}" style="width:auto" /> ${p.name} (${p.sku})</label>`
+        )
+        .join('');
+    }
+
+    document.getElementById('orderForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const productIds = form.getAll('productIds');
+      const result = document.getElementById('result');
+      if (productIds.length === 0) {
+        result.textContent = 'Select at least one product.';
+        return;
+      }
+      const res = await fetch('/customer-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: form.get('customerId'),
+          storeId: form.get('storeId'),
+          productIds,
+        }),
+      });
+      const body = await res.json();
+      result.textContent = res.ok
+        ? `Order created:\n${JSON.stringify(body, null, 2)}`
+        : `Failed:\n${JSON.stringify(body, null, 2)}`;
+    });
+
+    loadOptions();
+  </script>
+</body>
+</html>

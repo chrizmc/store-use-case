@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Rules Admin</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }
+    label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.9em; }
+    input, textarea, select { width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; }
+    textarea { height: 70px; }
+    button { margin-top: 14px; padding: 8px 16px; }
+    a { color: #06c; }
+    #status { margin-top: 10px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <p><a href="/index.html">&larr; back</a></p>
+  <h1>Rules Admin</h1>
+  <p>Rules are data (rows in the <code>rules</code> table), not code &mdash; toggling or adding one here changes
+     behaviour immediately, without redeploying the backend.</p>
+
+  <table id="rulesTable">
+    <thead>
+      <tr><th>Name</th><th>Trigger table</th><th>Action type</th><th>Enabled</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Add rule</h2>
+  <form id="ruleForm">
+    <label>Name<input name="name" required /></label>
+    <label>Trigger table (e.g. inventory, order_items, customers)<input name="triggerTable" required /></label>
+    <label>Cypher query (against the Neo4j knowledge graph)<textarea name="cypherQuery" required></textarea></label>
+    <label>Action type (e.g. notify_manager, suggest_substitute)<input name="actionType" required /></label>
+    <label>Action params (JSON)<textarea name="actionParams">{}</textarea></label>
+    <label><input type="checkbox" name="enabled" checked style="width:auto;display:inline" /> Enabled</label>
+    <button type="submit">Create rule</button>
+  </form>
+  <div id="status"></div>
+
+  <script>
+    async function loadRules() {
+      const rules = await fetch('/rules').then((r) => r.json());
+      const tbody = document.querySelector('#rulesTable tbody');
+      tbody.innerHTML = '';
+      for (const rule of rules) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${rule.name}</td>
+          <td>${rule.trigger_table}</td>
+          <td>${rule.action_type}</td>
+          <td><input type="checkbox" data-id="${rule.id}" ${rule.enabled ? 'checked' : ''} /></td>
+        `;
+        tbody.appendChild(tr);
+      }
+      tbody.querySelectorAll('input[type=checkbox]').forEach((cb) => {
+        cb.addEventListener('change', async () => {
+          await fetch(`/rules/${cb.dataset.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: cb.checked }),
+          });
+        });
+      });
+    }
+
+    document.getElementById('ruleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const status = document.getElementById('status');
+      let actionParams;
+      try {
+        actionParams = JSON.parse(form.get('actionParams') || '{}');
+      } catch {
+        status.textContent = 'Action params must be valid JSON.';
+        return;
+      }
+      const res = await fetch('/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.get('name'),
+          triggerTable: form.get('triggerTable'),
+          cypherQuery: form.get('cypherQuery'),
+          actionType: form.get('actionType'),
+          actionParams,
+          enabled: form.get('enabled') === 'on',
+        }),
+      });
+      status.textContent = res.ok ? 'Rule created.' : 'Failed to create rule.';
+      if (res.ok) {
+        e.target.reset();
+        loadRules();
+      }
+    });
+
+    loadRules();
+  </script>
+</body>
+</html>

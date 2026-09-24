@@ -1,0 +1,29 @@
+{
+  "name": "bopis-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p .",
+    "start": "node dist/index.js",
+    "migrate": "psql \"$PGDATABASE\" -f ../db/schema.sql",
+    "seed": "psql \"$PGDATABASE\" -f ../db/seed_mock_sap.sql && psql \"$PGDATABASE\" -f ../db/seed_rules.sql",
+    "neo4j:init": "cypher-shell -u neo4j -p \"$NEO4J_PASSWORD\" -f ../neo4j/constraints.cypher",
+    "seed:neo4j": "tsx scripts/seedNeo4j.ts",
+    "seed:embeddings": "tsx scripts/backfillEmbeddings.ts"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^8.3.1",
+    "@fastify/static": "^6.12.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "neo4j-driver": "^5.24.0",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.16.5",
+    "typescript": "^5.5.4"
+  }
+}
