@@ -67,6 +67,9 @@ dependencies {
 
     // Pure open-source QR scanning (Apache 2.0), no Google Play Services / API key required.
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // Explicit core dep: decoding a still image (gallery upload) uses zxing's decode classes
+    // directly rather than the embedded scanner Activity.
+    implementation("com.google.zxing:core:3.5.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
