@@ -26,11 +26,40 @@ export async function rulesRoutes(app: FastifyInstance) {
 
   app.patch('/rules/:id', async (req) => {
     const { id } = req.params as { id: string };
-    const { enabled } = req.body as { enabled: boolean };
-    const [rule] = await query('UPDATE rules SET enabled = $2 WHERE id = $1 RETURNING *', [
-      id,
-      enabled,
-    ]);
+    const { name, description, triggerTable, cypherQuery, actionType, actionParams, enabled } =
+      req.body as {
+        name?: string;
+        description?: string;
+        triggerTable?: string;
+        cypherQuery?: string;
+        actionType?: string;
+        actionParams?: Record<string, unknown>;
+        enabled?: boolean;
+      };
+    // Every field is optional so the same endpoint serves both the enabled-toggle
+    // checkbox and the full "edit rule" form — COALESCE leaves unspecified fields as-is.
+    const [rule] = await query(
+      `UPDATE rules SET
+         name = COALESCE($2, name),
+         description = COALESCE($3, description),
+         trigger_table = COALESCE($4, trigger_table),
+         cypher_query = COALESCE($5, cypher_query),
+         action_type = COALESCE($6, action_type),
+         action_params = COALESCE($7, action_params),
+         enabled = COALESCE($8, enabled),
+         updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [
+        id,
+        name ?? null,
+        description ?? null,
+        triggerTable ?? null,
+        cypherQuery ?? null,
+        actionType ?? null,
+        actionParams ?? null,
+        enabled ?? null,
+      ]
+    );
     return rule;
   });
 }

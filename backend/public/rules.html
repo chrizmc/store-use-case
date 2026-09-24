@@ -21,15 +21,22 @@
   <p>Rules are data (rows in the <code>rules</code> table), not code &mdash; toggling or adding one here changes
      behaviour immediately, without redeploying the backend.</p>
 
+  <p>Rules physically live as rows in Postgres (<code>rules</code> table) &mdash; not inside Neo4j.
+     Neo4j only stores the shelves/products/customers the Cypher query below reads; the rule
+     definition itself (name, Cypher, action) is plain Postgres data, version-controlled in
+     <code>db/seed_rules.sql</code> and editable here.</p>
+  <button id="downloadBtn" type="button">Download rules.json</button>
+
   <table id="rulesTable">
     <thead>
-      <tr><th>Name</th><th>What it does</th><th>Trigger table</th><th>Action type</th><th>Enabled</th></tr>
+      <tr><th>Name</th><th>What it does</th><th>Trigger table</th><th>Action type</th><th>Enabled</th><th></th></tr>
     </thead>
     <tbody></tbody>
   </table>
 
-  <h2>Add rule</h2>
+  <h2 id="formTitle">Add rule</h2>
   <form id="ruleForm">
+    <input type="hidden" name="id" />
     <label>Name<input name="name" required /></label>
     <label>Description (plain English, shown to non-technical readers)<textarea name="description"></textarea></label>
     <label>Trigger table (e.g. inventory, order_items, customers)<input name="triggerTable" required /></label>
@@ -37,16 +44,19 @@
     <label>Action type (e.g. notify_manager, suggest_substitute)<input name="actionType" required /></label>
     <label>Action params (JSON)<textarea name="actionParams">{}</textarea></label>
     <label><input type="checkbox" name="enabled" checked style="width:auto;display:inline" /> Enabled</label>
-    <button type="submit">Create rule</button>
+    <button type="submit" id="submitBtn">Create rule</button>
+    <button type="button" id="cancelEditBtn" style="display:none">Cancel edit</button>
   </form>
   <div id="status"></div>
 
   <script>
+    let currentRules = [];
+
     async function loadRules() {
-      const rules = await fetch('/rules').then((r) => r.json());
+      currentRules = await fetch('/rules').then((r) => r.json());
       const tbody = document.querySelector('#rulesTable tbody');
       tbody.innerHTML = '';
-      for (const rule of rules) {
+      for (const rule of currentRules) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${rule.name}</td>
@@ -54,6 +64,7 @@
           <td>${rule.trigger_table}</td>
           <td>${rule.action_type}</td>
           <td><input type="checkbox" data-id="${rule.id}" ${rule.enabled ? 'checked' : ''} /></td>
+          <td><button type="button" data-edit-id="${rule.id}">Edit</button></td>
         `;
         tbody.appendChild(tr);
       }
@@ -66,7 +77,49 @@
           });
         });
       });
+      tbody.querySelectorAll('button[data-edit-id]').forEach((btn) => {
+        btn.addEventListener('click', () => startEdit(btn.dataset.editId));
+      });
     }
+
+    function startEdit(id) {
+      const rule = currentRules.find((r) => r.id === id);
+      if (!rule) return;
+      const form = document.getElementById('ruleForm');
+      form.id.value = rule.id;
+      form.name.value = rule.name;
+      form.description.value = rule.description ?? '';
+      form.triggerTable.value = rule.trigger_table;
+      form.cypherQuery.value = rule.cypher_query;
+      form.actionType.value = rule.action_type;
+      form.actionParams.value = JSON.stringify(rule.action_params ?? {}, null, 2);
+      form.enabled.checked = rule.enabled;
+      document.getElementById('formTitle').textContent = `Edit rule: ${rule.name}`;
+      document.getElementById('submitBtn').textContent = 'Save changes';
+      document.getElementById('cancelEditBtn').style.display = 'inline-block';
+      form.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function resetForm() {
+      const form = document.getElementById('ruleForm');
+      form.reset();
+      form.id.value = '';
+      document.getElementById('formTitle').textContent = 'Add rule';
+      document.getElementById('submitBtn').textContent = 'Create rule';
+      document.getElementById('cancelEditBtn').style.display = 'none';
+    }
+
+    document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(currentRules, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rules.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
 
     document.getElementById('ruleForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -79,22 +132,24 @@
         status.textContent = 'Action params must be valid JSON.';
         return;
       }
-      const res = await fetch('/rules', {
-        method: 'POST',
+      const id = form.get('id');
+      const body = {
+        name: form.get('name'),
+        description: form.get('description'),
+        triggerTable: form.get('triggerTable'),
+        cypherQuery: form.get('cypherQuery'),
+        actionType: form.get('actionType'),
+        actionParams,
+        enabled: form.get('enabled') === 'on',
+      };
+      const res = await fetch(id ? `/rules/${id}` : '/rules', {
+        method: id ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: form.get('name'),
-          description: form.get('description'),
-          triggerTable: form.get('triggerTable'),
-          cypherQuery: form.get('cypherQuery'),
-          actionType: form.get('actionType'),
-          actionParams,
-          enabled: form.get('enabled') === 'on',
-        }),
+        body: JSON.stringify(body),
       });
-      status.textContent = res.ok ? 'Rule created.' : 'Failed to create rule.';
+      status.textContent = res.ok ? (id ? 'Rule updated.' : 'Rule created.') : 'Failed to save rule.';
       if (res.ok) {
-        e.target.reset();
+        resetForm();
         loadRules();
       }
     });
