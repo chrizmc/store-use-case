@@ -79,7 +79,25 @@ neo4j-admin dbms set-initial-password <your-password>
 neo4j start
 ```
 
-## Start the demo (single command, always gives a clean/empty state)
+## Start the demo
+
+### Option A — one overall command (services → clean data → backend → emulator → app)
+
+```bash
+scripts/start-demo.sh
+```
+
+Starts Postgres/Neo4j/Ollama if not already running, resets the DB and graph to a clean
+state (`demo:reset`), starts the backend, boots the emulator if needed, then builds,
+installs and launches the Android app. Safe to re-run any time you want to go back to a
+clean/empty state. Add `SKIP_ANDROID=1` to only reset data and start the backend, e.g. if
+the emulator/app are already up and you just want fresh data:
+
+```bash
+SKIP_ANDROID=1 scripts/start-demo.sh
+```
+
+### Option B — individual commands (if you only need to redo one part)
 
 ```bash
 cd backend
@@ -88,6 +106,9 @@ npm run demo:reset   # drops+recreates the DB, re-applies schema, seeds master d
 nohup npm run dev < /dev/null > /tmp/backend.log 2>&1 & disown
 curl localhost:3000/health   # {"status":"ok"}
 ```
+
+(the Android emulator boot / build / install commands are unchanged — see
+[Android setup](#android-setup-emulator--build) below.)
 
 After `demo:reset`, `rules`/`products`/`stores`/`shelves`/`inventory`/`customers` are
 pre-seeded (mock SAP master data — see the mapping table above) but **`orders` is
