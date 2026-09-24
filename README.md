@@ -62,29 +62,38 @@ python3 -m pip install piper-tts
 python3 -m piper.download_voices --download-dir backend/models en_US-lessac-medium
 ```
 
-## Setup
+## Setup (first time only)
 
 ```bash
-createdb bopis
 cd backend
 cp .env.example .env   # then set PGUSER to $(whoami) and clear PGPASSWORD (Homebrew Postgres uses trust auth)
 npm install
-npm run migrate      # applies db/schema.sql
-npm run seed         # applies db/seed_mock_sap.sql + db/seed_rules.sql
-npm run neo4j:init   # applies neo4j/constraints.cypher
-npm run seed:neo4j   # one-time static graph population (products, substitutes, shelves, stores)
-npm run dev          # starts the API on :3000 and the rule listener
 ```
 
-Neo4j requires a one-time password change on first login before `neo4j:init` will work:
+Neo4j requires a one-time password change on first login, matching whatever you put in
+`.env` as `NEO4J_PASSWORD` — this must happen before the very first `neo4j start`:
 
 ```bash
 neo4j stop
-neo4j-admin dbms set-initial-password <your-password>   # must run before the very first start
+neo4j-admin dbms set-initial-password <your-password>
 neo4j start
 ```
 
-Health check: `curl localhost:3000/health`
+## Start the demo (single command, always gives a clean/empty state)
+
+```bash
+cd backend
+npm run demo:reset   # drops+recreates the DB, re-applies schema, seeds master data +
+                      # rules (NOT orders), wipes and rebuilds the Neo4j graph
+nohup npm run dev < /dev/null > /tmp/backend.log 2>&1 & disown
+curl localhost:3000/health   # {"status":"ok"}
+```
+
+After `demo:reset`, `rules`/`products`/`stores`/`shelves`/`inventory`/`customers` are
+pre-seeded (mock SAP master data — see the mapping table above) but **`orders` is
+empty on purpose**, so the Customer Order Simulator → Android app flow can be shown
+live from scratch. If you want one pre-existing order for quick manual testing instead,
+also run `npm run seed:demo-order`.
 
 Backend must always be started with stdin redirected from `/dev/null`, otherwise
 `tsx watch`'s stdin-keypress listener can get the process suspended (`SIGTTIN`)
@@ -149,15 +158,17 @@ flowing between screens, not to narrate slides:
 2. **Browser tab** — `/simulator.html` (Customer Order Simulator).
 3. **Browser tab** — `/rules.html` (Rules Admin).
 4. **Browser tab** — Neo4j Browser (`localhost:7474`), with a Cypher query like
-   `MATCH (r) RETURN r LIMIT 50` ready to re-run to show the live graph.
+   `MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 100` ready to re-run to show the live graph
+   (a plain `MATCH (n) RETURN n` only returns bare nodes with no relationship lines).
 5. **Terminal** — `tail -f /tmp/backend.log` visible in a corner, so rule firings
    and sync requests scroll live as you interact with the app.
 
 Suggested walkthrough:
 
 1. In the **Customer Order Simulator**, create a new order for a customer/store/product.
-2. Switch to the **Android app** → pull-to-refresh (or restart) the Orders list → the new
-   order appears (proves the DB, not a bespoke customer app, is the shared source of truth).
+2. Switch to the **Android app** → tap **Refresh** in the Orders top bar → the new order
+   appears (proves the DB, not a bespoke customer app, is the shared source of truth;
+   there's no auto-refresh/pull-to-refresh by design — keep it simple, one explicit action).
 3. Open the order → scan a shelf QR code (or tap through if the emulator has no camera feed)
    → tap **Picked Up** / **Is Empty** / **Is Nearly Empty**.
 4. If **Is Empty**: the app shows a suggested substitute (rule-fired, only offered because
@@ -192,6 +203,8 @@ Suggested walkthrough:
 - Conflict resolution is last-write-wins via a global logical clock
   (`global_version_seq`); production would evaluate CRDT-based engines
   (see [docs/architecture.md](docs/architecture.md)).
+- The Orders screen has no pull-to-refresh/auto-refresh — tap the explicit **Refresh**
+  button in the top bar after creating an order elsewhere (e.g. the simulator).
 
 ## Troubleshooting
 

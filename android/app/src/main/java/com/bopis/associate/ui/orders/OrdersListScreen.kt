@@ -11,6 +11,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,7 +23,17 @@ import com.bopis.associate.data.remote.OrderSummary
 fun OrdersListScreen(viewModel: OrdersViewModel, onOrderClick: (String) -> Unit) {
     LaunchedEffect(Unit) { viewModel.load() }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Open Orders") }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Open Orders") },
+                // Compose doesn't re-run LaunchedEffect(Unit) when navigating back to this
+                // screen, so orders created elsewhere (e.g. the Customer Order Simulator)
+                // need an explicit way to reload without restarting the app.
+                actions = { TextButton(onClick = { viewModel.load() }) { Text("Refresh") } },
+            )
+        }
+    ) { padding ->
         if (viewModel.loading && viewModel.orders.isEmpty()) {
             CircularProgressIndicator(modifier = Modifier.padding(padding))
         } else {

@@ -38,10 +38,8 @@ INSERT INTO customers (id, name, alternative_ok_if_empty, last_order_at) VALUES
   ('c1000000-0000-0000-0000-000000000001', 'Alice Johnson', true, now() - interval '90 days'),
   ('c1000000-0000-0000-0000-000000000002', 'Bob Smith', false, now() - interval '2 days');
 
--- Mock: SAP S/4HANA Sales Order ----------------------------------------------
-INSERT INTO orders (id, customer_id, store_id, status) VALUES
-  ('d1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'open');
+-- No orders are seeded here on purpose: the Orders list should start empty so the
+-- Customer Order Simulator → Android app flow can be demonstrated live end-to-end.
+-- Run `npm run seed:demo-order` (applies seed_demo_order.sql) if you want one
+-- pre-existing order for quick manual testing without using the simulator.
 
-INSERT INTO order_items (order_id, product_id, status) VALUES
-  ('d1000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000001', 'pending'),
-  ('d1000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000005', 'pending');

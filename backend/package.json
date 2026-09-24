@@ -6,11 +6,15 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p .",
     "start": "node dist/index.js",
-    "migrate": "psql \"$PGDATABASE\" -f ../db/schema.sql",
-    "seed": "psql \"$PGDATABASE\" -f ../db/seed_mock_sap.sql && psql \"$PGDATABASE\" -f ../db/seed_rules.sql",
-    "neo4j:init": "cypher-shell -u neo4j -p \"$NEO4J_PASSWORD\" -f ../neo4j/constraints.cypher",
+    "db:reset": "scripts/with-env.sh 'dropdb --if-exists \"$PGDATABASE\" && createdb \"$PGDATABASE\"'",
+    "migrate": "scripts/with-env.sh 'psql -f ../db/schema.sql'",
+    "seed": "scripts/with-env.sh 'psql -f ../db/seed_mock_sap.sql && psql -f ../db/seed_rules.sql'",
+    "seed:demo-order": "scripts/with-env.sh 'psql -f ../db/seed_demo_order.sql'",
+    "neo4j:reset": "scripts/with-env.sh 'cypher-shell -u \"$NEO4J_USER\" -p \"$NEO4J_PASSWORD\" \"MATCH (n) DETACH DELETE n\"'",
+    "neo4j:init": "scripts/with-env.sh 'cypher-shell -u \"$NEO4J_USER\" -p \"$NEO4J_PASSWORD\" -f ../neo4j/constraints.cypher'",
     "seed:neo4j": "tsx scripts/seedNeo4j.ts",
-    "seed:embeddings": "tsx scripts/backfillEmbeddings.ts"
+    "seed:embeddings": "tsx scripts/backfillEmbeddings.ts",
+    "demo:reset": "npm run db:reset && npm run migrate && npm run seed && npm run neo4j:reset && npm run neo4j:init && npm run seed:neo4j"
   },
   "dependencies": {
     "@fastify/multipart": "^8.3.1",
