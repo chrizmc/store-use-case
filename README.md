@@ -32,9 +32,51 @@ technical interview.
   (`/rules.html`), served directly by Fastify as static HTML/vanilla JS (no build step, no
   separate customer app — the shared basis is the database).
 
-See [docs/architecture.md](docs/architecture.md) for diagrams and the
-production-replacement mapping (for interview slides), and
-[docs/data-model.md](docs/data-model.md) / [docs/api.md](docs/api.md) for
+### How it fits together (simple view)
+
+```mermaid
+flowchart LR
+    Android["📱 Android App\n(associate)"] -->|REST| API["Middleware API\n(Fastify)"]
+    WebUI["🖥️ Simulator / Rules Admin"] -->|REST| API
+
+    API --> PG[("Postgres\nsource of truth\n+ pgvector embeddings")]
+    API --> Neo[("Neo4j\nlive-synced graph\nrules as data")]
+    API --> AI["Local AI\nOllama · whisper.cpp · Piper"]
+
+    PG -. "row changes\n(pg_notify)" .-> Neo
+    Neo -. "rule fires" .-> PG
+    PG -. "notifications/status" .-> Android
+```
+
+Postgres is the only place data is ever written first; Neo4j and the AI layer only
+*read* from it or write back derived results (notifications, substitutions) — never
+the other way around.
+
+### Where the vector DB (pgvector) fits in
+
+The vector DB's job is narrow and easy to reason about: it only answers **"which
+product is the associate asking about?"** — it never decides what counts as a
+valid substitute.
+
+```mermaid
+flowchart LR
+    Q["Associate's question\n(typed or voice)"] --> Embed["Embed question\n(Ollama)"]
+    Embed --> Match["pgvector: nearest\nproduct by embedding"]
+    Match --> Sub["Look up that product's\ncurated substitutes table"]
+    Sub --> LLM["Ollama LLM composes\nthe final answer"]
+```
+
+1. The question text is embedded (same Ollama model used to embed every product's
+   name/description at seed time).
+2. pgvector's `<=>` distance operator finds the single closest-matching `products` row —
+   this is the *only* thing vector search decides.
+3. That product's real substitutes come from the curated `substitutes` table (not
+   vector search) — if there are none, the LLM is explicitly told not to invent one.
+4. The LLM only formats the final sentence from that structured, already-correct context.
+
+See [docs/architecture.md](docs/architecture.md) for the full sequence diagram of the
+graph-sync/rule-firing loop and the production-replacement mapping (for interview slides),
+and [docs/data-model.md](docs/data-model.md) / [docs/api.md](docs/api.md) for
 the data model and API contract.
 
 ## Prerequisites (macOS, Homebrew, no Docker)
