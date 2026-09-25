@@ -45,11 +45,18 @@ else
     echo "==> Booting emulator ($AVD_NAME)"
     nohup "$HOME/Library/Android/sdk/emulator/emulator" -avd "$AVD_NAME" \
       -no-boot-anim -no-snapshot > /tmp/emulator.log 2>&1 & disown
-    "$ADB" wait-for-device
-    until "$ADB" shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 2; done
-    EMULATOR_SERIAL=$("$ADB" devices | awk '$2=="device" && $1 ~ /^emulator-/ {print $1; exit}')
+
+    # Target the emulator's own serial explicitly below - with a phone already
+    # attached, unqualified "adb wait-for-device"/"adb shell" can match the phone
+    # instead and return before the emulator is actually ready.
+    until EMULATOR_SERIAL=$("$ADB" devices | awk '$1 ~ /^emulator-/ {print $1; exit}') && [[ -n "$EMULATOR_SERIAL" ]]; do
+      sleep 1
+    done
+    "$ADB" -s "$EMULATOR_SERIAL" wait-for-device
+    until "$ADB" -s "$EMULATOR_SERIAL" shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 2; done
   fi
   echo "    emulator ready ($EMULATOR_SERIAL)"
+  [[ -n "$EMULATOR_SERIAL" ]] || { echo "no emulator serial detected, aborting"; exit 1; }
 
   echo "==> Building app"
   (cd android && gradle assembleDebug)
