@@ -70,10 +70,17 @@ private fun BopisApp(repository: BopisRepository) {
                     NavigationBarItem(
                         selected = currentRoute?.hierarchy?.any { it.route == route } == true,
                         onClick = {
+                            // Deliberately NOT using the standard saveState/restoreState
+                            // recipe: OrderDetail/ShelfAction are flat destinations (not a
+                            // nested graph scoped to the Orders tab), so restoreState was
+                            // resurrecting whatever screen the associate had drilled into
+                            // (e.g. a Shelf screen) instead of the tab's root - tapping
+                            // "Orders" could silently show a stale Shelf screen rather than
+                            // the orders list. Clearing the whole back stack guarantees each
+                            // tab tap always lands on that tab's root screen with a fresh load.
                             navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = {},

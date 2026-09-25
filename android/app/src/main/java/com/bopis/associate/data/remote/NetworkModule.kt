@@ -1,5 +1,6 @@
 package com.bopis.associate.data.remote
 
+import android.os.Build
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -9,9 +10,21 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import java.util.concurrent.TimeUnit
 
 object NetworkModule {
-    // 10.0.2.2 is the Android emulator's alias for the host machine's localhost.
-    // On a physical device (e.g. Pixel 6a), replace with the host's LAN IP.
-    const val BASE_URL = "http://10.0.2.2:3000/"
+    // Emulator reaches the host's localhost via 10.0.2.2; a physical device reaches it
+    // via 127.0.0.1 + `adb reverse tcp:3000 tcp:3000` (re-run once per USB connection).
+    // Auto-detected so the same build works unchanged on both.
+    val BASE_URL = "http://${if (isEmulator()) "10.0.2.2" else "127.0.0.1"}:3000/"
+
+    private fun isEmulator(): Boolean =
+        Build.FINGERPRINT.startsWith("generic") ||
+            Build.FINGERPRINT.startsWith("unknown") ||
+            Build.MODEL.contains("google_sdk") ||
+            Build.MODEL.contains("Emulator") ||
+            Build.MODEL.contains("Android SDK built for x86") ||
+            Build.MANUFACTURER.contains("Genymotion") ||
+            Build.HARDWARE.contains("goldfish") ||
+            Build.HARDWARE.contains("ranchu") ||
+            Build.PRODUCT.contains("sdk_gphone")
 
     private val json = Json { ignoreUnknownKeys = true }
 

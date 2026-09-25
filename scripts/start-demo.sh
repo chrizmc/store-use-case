@@ -40,19 +40,35 @@ if [[ "$SKIP_ANDROID" == "1" ]]; then
 else
   export JAVA_HOME
 
-  if ! "$ADB" devices | grep -q "device$"; then
+  EMULATOR_SERIAL=$("$ADB" devices | awk '$2=="device" && $1 ~ /^emulator-/ {print $1; exit}')
+  if [[ -z "$EMULATOR_SERIAL" ]]; then
     echo "==> Booting emulator ($AVD_NAME)"
     nohup "$HOME/Library/Android/sdk/emulator/emulator" -avd "$AVD_NAME" \
       -no-boot-anim -no-snapshot > /tmp/emulator.log 2>&1 & disown
     "$ADB" wait-for-device
     until "$ADB" shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do sleep 2; done
+    EMULATOR_SERIAL=$("$ADB" devices | awk '$2=="device" && $1 ~ /^emulator-/ {print $1; exit}')
   fi
-  echo "    emulator ready"
+  echo "    emulator ready ($EMULATOR_SERIAL)"
 
-  echo "==> Building + installing app"
+  echo "==> Building app"
   (cd android && gradle assembleDebug)
-  "$ADB" install -r android/app/build/outputs/apk/debug/app-debug.apk
-  "$ADB" shell am start -n com.bopis.associate/.MainActivity
+  APK="android/app/build/outputs/apk/debug/app-debug.apk"
+
+  echo "==> Installing + launching on emulator"
+  "$ADB" -s "$EMULATOR_SERIAL" install -r "$APK"
+  "$ADB" -s "$EMULATOR_SERIAL" shell am start -n com.bopis.associate/.MainActivity
+
+  # Any other attached device (e.g. a Pixel over USB) is a physical test device -
+  # NetworkModule auto-detects it's not an emulator and uses 127.0.0.1, so it needs
+  # the backend port forwarded from the device to this machine.
+  PHONE_SERIALS=$("$ADB" devices | awk '$2=="device" && $1 !~ /^emulator-/ {print $1}')
+  for serial in $PHONE_SERIALS; do
+    echo "==> Installing + launching on physical device ($serial)"
+    "$ADB" -s "$serial" reverse tcp:3000 tcp:3000
+    "$ADB" -s "$serial" install -r "$APK"
+    "$ADB" -s "$serial" shell am start -n com.bopis.associate/.MainActivity
+  done
 fi
 
 cat <<'EOF'
