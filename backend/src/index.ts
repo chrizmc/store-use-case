@@ -11,6 +11,7 @@ import { rulesRoutes } from './routes/rules.js';
 import { assistantRoutes } from './routes/assistant.js';
 import { customerOrdersRoutes } from './routes/customerOrders.js';
 import { catalogRoutes } from './routes/catalog.js';
+import { eventsRoutes } from './routes/events.js';
 import { startRuleListener } from './rules/listener.js';
 
 const app = Fastify({ logger: true });
@@ -26,6 +27,7 @@ app.register(rulesRoutes);
 app.register(assistantRoutes);
 app.register(customerOrdersRoutes);
 app.register(catalogRoutes);
+app.register(eventsRoutes);
 
 app.get('/health', async () => ({ status: 'ok' }));
 

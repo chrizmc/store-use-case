@@ -21,6 +21,11 @@ object NetworkModule {
         .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
         .build()
 
+    // Server-sent-events connections stay open indefinitely, so they need no read timeout.
+    val sseClient: OkHttpClient = okHttpClient.newBuilder()
+        .readTimeout(0, TimeUnit.SECONDS)
+        .build()
+
     val api: ApiService = Retrofit.Builder()
         .baseUrl(BASE_URL)
         .client(okHttpClient)
