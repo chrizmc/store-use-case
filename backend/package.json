@@ -14,7 +14,7 @@
     "neo4j:init": "scripts/with-env.sh 'cypher-shell -u \"$NEO4J_USER\" -p \"$NEO4J_PASSWORD\" -f ../neo4j/constraints.cypher'",
     "seed:neo4j": "tsx scripts/seedNeo4j.ts",
     "seed:embeddings": "tsx scripts/backfillEmbeddings.ts",
-    "qrcodes:generate": "tsx scripts/generateQrCodes.ts",
+    "qrcodes:generate": "tsx scripts/generateQrCodes.ts && (../scripts/push-qrcodes-to-emulator.sh || echo 'Skipping emulator push (no device connected).')",
     "demo:reset": "npm run db:reset && npm run migrate && npm run seed && npm run seed:embeddings && npm run neo4j:reset && npm run neo4j:init && npm run seed:neo4j && npm run qrcodes:generate"
   },
   "dependencies": {
