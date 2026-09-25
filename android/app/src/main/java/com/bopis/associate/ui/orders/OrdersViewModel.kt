@@ -18,18 +18,37 @@ class OrdersViewModel(private val repository: BopisRepository) : ViewModel() {
         private set
 
     private val eventsClient = OrderEventsClient(viewModelScope) { load() }
+    private var liveUpdatesStarted = false
+
+    // Bumped on every load() call; a fetch only applies its result if it's still the
+    // most recently requested one. Without this, overlapping loads (e.g. the screen's
+    // own entry reload racing an SSE-triggered reload) could let a slower, older
+    // response overwrite a newer one and leave the list looking stale/incomplete.
+    private var loadRequestId = 0
 
     fun load() {
+        val requestId = ++loadRequestId
         viewModelScope.launch {
             loading = true
-            orders = repository.getOrders(Constants.STORE_ID)
-            loading = false
+            try {
+                val result = repository.getOrders(Constants.STORE_ID)
+                if (requestId == loadRequestId) orders = result
+            } finally {
+                if (requestId == loadRequestId) loading = false
+            }
         }
     }
 
-    // Starts listening for live order/order-item changes pushed from the backend;
-    // safe to call repeatedly (e.g. every time the screen re-enters composition).
-    fun startLiveUpdates() = eventsClient.start()
+    // Starts listening for live order/order-item changes pushed from the backend. Only
+    // opens one connection per ViewModel instance (which is retained across bottom-nav
+    // tab switches) - reopening it on every re-entry caused reconnect churn that could
+    // drop an event during the gap between the old connection closing and the new one
+    // being established.
+    fun startLiveUpdates() {
+        if (liveUpdatesStarted) return
+        liveUpdatesStarted = true
+        eventsClient.start()
+    }
 
     override fun onCleared() {
         eventsClient.stop()
