@@ -58,14 +58,15 @@ export async function syncEntityToNeo4j(table: string, id: string) {
 
   if (table === 'customers') {
     const [row] = await query(
-      'SELECT id, alternative_ok_if_empty, last_order_at FROM customers WHERE id = $1',
+      'SELECT id, name, alternative_ok_if_empty, last_order_at FROM customers WHERE id = $1',
       [id]
     );
     if (!row) return;
     await runCypher(
-      'MERGE (c:Customer {id: $id}) SET c.alternativeOkIfEmpty = $ok, c.lastOrderAt = $lastOrderAt',
+      'MERGE (c:Customer {id: $id}) SET c.name = $name, c.alternativeOkIfEmpty = $ok, c.lastOrderAt = $lastOrderAt',
       {
         id: row.id,
+        name: row.name,
         ok: row.alternative_ok_if_empty,
         lastOrderAt: row.last_order_at?.toISOString() ?? null,
       }

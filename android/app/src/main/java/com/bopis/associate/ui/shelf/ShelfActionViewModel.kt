@@ -9,6 +9,7 @@ import com.bopis.associate.data.ActionResult
 import com.bopis.associate.data.BopisRepository
 import com.bopis.associate.data.remote.Shelf
 import com.bopis.associate.data.remote.SubstituteCandidate
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // orderId/itemId are null when the associate scans a shelf outside of an order context
@@ -48,15 +49,26 @@ class ShelfActionViewModel(
 
             if (status == "empty" && orderId != null && itemId != null) {
                 repository.markUnavailable(orderId, itemId)
-                // The rule engine resolves the substitute server-side; poll the order
-                // briefly for the result rather than re-implementing that logic client-side.
-                val order = repository.getOrder(orderId)
-                val updatedItem = order.items.firstOrNull { it.id == itemId }
-                if (updatedItem?.substituted_with_product_id != null) {
-                    suggestedSubstitute = repository.getSubstitutes(orderId, itemId)
-                        .firstOrNull { it.product_id == updatedItem.substituted_with_product_id }
-                }
+                suggestedSubstitute = pollForSubstitute(orderId, itemId)
             }
         }
+    }
+
+    // The rule engine resolves the substitute asynchronously (it reacts to the order_items
+    // NOTIFY event, then checks the customer's opt-in and the substitute's own stock via a
+    // Neo4j query before writing substituted_with_product_id) - it isn't guaranteed to have
+    // finished by the time our own request completes. Poll briefly rather than giving up
+    // after a single check, which previously caused a false "no substitute" result.
+    private suspend fun pollForSubstitute(orderId: String, itemId: String): SubstituteCandidate? {
+        repeat(6) { attempt ->
+            val order = repository.getOrder(orderId)
+            val substituteId = order.items.firstOrNull { it.id == itemId }?.substituted_with_product_id
+            if (substituteId != null) {
+                return repository.getSubstitutes(orderId, itemId)
+                    .firstOrNull { it.product_id == substituteId }
+            }
+            if (attempt < 5) delay(400)
+        }
+        return null
     }
 }
