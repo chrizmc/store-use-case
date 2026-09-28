@@ -8,7 +8,10 @@ cached first response instead of re-applying the write.
 
 - `GET /orders?store_id=` — list orders for a store.
 - `GET /orders/:id` — order with its items.
-- `POST /orders/:id/items/:itemId/pick` — mark an item picked. *(Idempotency-Key required)*
+- `POST /orders/:id/items/:itemId/pick` — mark an item picked, and sends the customer a
+  "ready to collect your order" notification. *(Idempotency-Key required)*
+- `POST /orders/:id/items/:itemId/mark-unavailable` — mark an item unavailable (after its
+  shelf is reported empty). *(Idempotency-Key required)*
 - `POST /orders/:id/items/:itemId/substitute` — `{ substituteProductId }`. *(Idempotency-Key required)*
 
 ## Shelves (QR-scan flow)
@@ -29,8 +32,15 @@ cached first response instead of re-applying the write.
 
 ## Assistant (voice/RAG, text endpoint first)
 
-- `POST /assistant/query` — `{ question, storeId }` → `{ answer, similarProducts, graphFacts }`.
-  Combines pgvector similarity search with Neo4j Cypher facts, then asks a local Ollama LLM.
+- `POST /assistant/query` — `{ question, storeId }` → `{ answer, likelyProduct, substitutes, storeAvailability }`.
+  Matches the question to a product by keyword first (embeddings as fallback), looks up its
+  curated substitutes and per-store stock in Neo4j, then asks a local Ollama LLM to phrase the answer.
+
+## Notifications
+
+- `POST /notifications` — `{ role: "associate" | "manager" | "customer", type, payload }`.
+  Used for notifications not produced by the rule engine, e.g. the proactive agent recording
+  what the customer agreed to after a Yes/No prompt.
 
 ## Customer order simulator
 

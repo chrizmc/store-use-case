@@ -48,11 +48,18 @@ export async function ordersRoutes(app: FastifyInstance) {
   });
 
   app.post('/orders/:id/items/:itemId/pick', async (req, reply) => {
-    const { itemId } = req.params as { id: string; itemId: string };
+    const { id: orderId, itemId } = req.params as { id: string; itemId: string };
     return withIdempotency(req, reply, async () => {
       const [item] = await query(
         "UPDATE order_items SET status = 'picked' WHERE id = $1 RETURNING *",
         [itemId]
+      );
+      // Demo simplification: notify the customer on every item pick (no "all items done"
+      // check) - shows up as a "sent" alert, same as the existing manager notifications.
+      await query(
+        `INSERT INTO notifications (role, type, payload)
+         VALUES ('customer', 'ready_for_pickup', $1::jsonb)`,
+        [JSON.stringify({ order_id: orderId, message: 'Ready to collect your order' })]
       );
       return item;
     });

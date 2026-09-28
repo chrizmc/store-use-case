@@ -29,10 +29,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.bopis.associate.data.remote.OrderItem
 import com.bopis.associate.data.remote.Shelf
+import com.bopis.associate.ui.scan.QrScanScreen
 import com.bopis.associate.ui.scan.decodeQrFromUri
-import com.bopis.associate.ui.scan.rememberQrScanLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,7 +53,7 @@ fun OrderDetailScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
         ) {
-            items(order?.items ?: emptyList()) { item ->
+            items(order?.items ?: emptyList(), key = { it.id }) { item ->
                 OrderItemRow(item, viewModel.shelves, onScanForItem)
             }
         }
@@ -67,9 +69,21 @@ private fun OrderItemRow(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var uploadError by remember { mutableStateOf<String?>(null) }
+    var showScanner by remember { mutableStateOf(false) }
 
-    val launchScanner = rememberQrScanLauncher { qrCode ->
-        if (qrCode != null) onScanForItem(item.id, qrCode)
+    if (showScanner) {
+        Dialog(
+            onDismissRequest = { showScanner = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            QrScanScreen(
+                onDecoded = { qrCode ->
+                    showScanner = false
+                    onScanForItem(item.id, qrCode)
+                },
+                onCancel = { showScanner = false },
+            )
+        }
     }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -92,7 +106,7 @@ private fun OrderItemRow(
             Text(item.product_name ?: item.product_id)
             Text("Status: ${item.status}" + (item.substituted_with_product_name?.let { " \u2192 $it" } ?: ""))
             if (item.status == "pending") {
-                Button(onClick = launchScanner) { Text("Scan shelf") }
+                Button(onClick = { showScanner = true }) { Text("Scan shelf") }
                 TextButton(onClick = { pickImage.launch("image/*") }) { Text("Upload QR photo") }
                 TextButton(onClick = { pickerExpanded = true }) { Text("Pick shelf (no camera)") }
                 DropdownMenu(expanded = pickerExpanded, onDismissRequest = { pickerExpanded = false }) {

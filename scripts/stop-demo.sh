@@ -13,6 +13,9 @@ FULL="${FULL:-0}"
 echo "==> Stopping backend"
 pkill -f "tsx watch src/index.ts" 2>/dev/null && echo "    stopped" || echo "    not running"
 
+echo "==> Stopping screen mirroring (scrcpy)"
+pkill -f "scrcpy -s" 2>/dev/null && echo "    stopped" || echo "    not running"
+
 echo "==> Stopping emulator"
 if "$ADB" devices 2>/dev/null | grep -q "device$"; then
   "$ADB" emu kill 2>/dev/null && echo "    stopped" || echo "    could not stop via adb"

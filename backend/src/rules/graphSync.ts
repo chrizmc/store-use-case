@@ -6,7 +6,7 @@ import { runCypher } from '../db/neo4j.js';
 export async function syncEntityToNeo4j(table: string, id: string) {
   if (table === 'inventory') {
     const [row] = await query(
-      `SELECT i.shelf_id, i.qty, i.status, s.qr_code, s.product_id, s.store_id, st.name AS store_name
+      `SELECT i.shelf_id, i.qty, i.status, s.qr_code, s.aisle, s.product_id, s.store_id, st.name AS store_name, st.address AS store_address
        FROM inventory i
        JOIN shelves s ON s.id = i.shelf_id
        JOIN stores st ON st.id = s.store_id
@@ -18,20 +18,22 @@ export async function syncEntityToNeo4j(table: string, id: string) {
     // stores with no seeded shelves/inventory (e.g. a brand-new store) won't show up yet.
     await runCypher(
       `MERGE (s:Shelf {id: $shelfId})
-       SET s.qrCode = $qrCode, s.status = $status, s.qty = $qty
+       SET s.qrCode = $qrCode, s.status = $status, s.qty = $qty, s.aisle = $aisle
        MERGE (p:Product {id: $productId})
        MERGE (st:Store {id: $storeId})
-       SET st.name = $storeName
+       SET st.name = $storeName, st.address = $storeAddress
        MERGE (p)-[:STOCKED_AT]->(s)
        MERGE (s)-[:LOCATED_IN]->(st)`,
       {
         shelfId: row.shelf_id,
         qrCode: row.qr_code,
+        aisle: row.aisle,
         status: row.status,
         qty: row.qty,
         productId: row.product_id,
         storeId: row.store_id,
         storeName: row.store_name,
+        storeAddress: row.store_address,
       }
     );
     return;

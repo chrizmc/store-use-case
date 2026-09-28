@@ -78,6 +78,13 @@ data class AppNotification(
 )
 
 @Serializable
+data class CreateNotificationRequest(
+    val role: String,
+    val type: String,
+    val payload: Map<String, String> = emptyMap(),
+)
+
+@Serializable
 data class SyncChanges(
     val inventory: List<InventoryRow> = emptyList(),
     val order_items: List<OrderItem> = emptyList(),
@@ -107,3 +114,9 @@ data class AssistantResponse(
     val question: String? = null,
     val audioBase64: String? = null,
 )
+
+@Serializable
+data class SpeakRequest(val text: String)
+
+@Serializable
+data class SpeakResponse(val audioBase64: String? = null)

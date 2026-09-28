@@ -3,20 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <title>Rules Admin</title>
-  <style>
-    body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-    th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }
-    label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.9em; }
-    input, textarea, select { width: 100%; box-sizing: border-box; padding: 6px; font-family: monospace; }
-    textarea { height: 70px; }
-    button { margin-top: 14px; padding: 8px 16px; }
-    a { color: #06c; }
-    #status { margin-top: 10px; font-size: 0.9em; }
-  </style>
+  <link rel="stylesheet" href="/theme.css" />
 </head>
 <body>
-  <p><a href="/index.html">&larr; back</a></p>
+  <div class="brandbar"><span class="badge">SAP</span><span class="title">BOPIS Demo Admin</span></div>
+  <a class="back" href="/index.html">&larr; back</a>
   <h1>Rules Admin</h1>
   <p>Rules are data (rows in the <code>rules</code> table), not code &mdash; toggling or adding one here changes
      behaviour immediately, without redeploying the backend.</p>

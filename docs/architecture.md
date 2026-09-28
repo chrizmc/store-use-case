@@ -11,21 +11,19 @@ flowchart TB
     end
 
     subgraph Client["Clients"]
-        Android["Android App (Kotlin, Compose)\nRoom DB + Outbox - CameraX/ZXing QR - WorkManager Sync"]
+        Android["Android App (Kotlin, Compose)\nRoom DB (cache + outbox) - CameraX/ZXing QR"]
         WebSim["Web UI: Customer Order Simulator"]
         WebRules["Web UI: Rules Admin"]
     end
 
-    subgraph Middleware["Middleware (Node.js + TypeScript, Fastify)"]
-        API["REST API (orders, shelves, sync, rules, assistant)"]
-        SyncEngine["Sync Engine (outbox / changefeed, per-store)"]
-        RuleEngine["Rule Engine (LISTEN/NOTIFY driven)"]
-        AIService["AI modules (embeddings, LLM, STT, TTS)"]
-    end
+    subgraph Backend["Backend = a thin shim directly over the Data Layer, not a separate business-logic tier"]
+        API["Fastify HTTP endpoints\n(orders, shelves, sync, rules, assistant)\n- no business logic of its own -"]
+        AIService["AI modules (embeddings, LLM, STT, TTS)\n- compose answers from facts the Data Layer already found -"]
 
-    subgraph Data["Data Layer"]
-        PG["PostgreSQL 16 + pgvector\n(system of record + embeddings)"]
-        Neo["Neo4j Community\n(live-mirrored knowledge graph, rules as data)"]
+        subgraph Data["Data Layer - where the real logic lives"]
+            PG["PostgreSQL 17 + pgvector\n(source of truth + embeddings + rules table)"]
+            Neo["Neo4j Community\n(live-mirrored knowledge graph; rule Cypher runs here)"]
+        end
     end
 
     subgraph AI["Local AI Runtime (no API keys, no accounts)"]
@@ -35,14 +33,13 @@ flowchart TB
     end
 
     Mocks --> PG
-    Android <--> SyncEngine
+    Android <--> API
     WebSim --> API
     WebRules --> API
     API --> PG
     API --> Neo
-    SyncEngine --> PG
-    RuleEngine --> PG
-    RuleEngine --> Neo
+    PG -. "row changes (pg_notify)" .-> Neo
+    Neo -. "rule fires" .-> PG
     AIService --> Ollama
     AIService --> Whisper
     AIService --> Piper
@@ -51,16 +48,35 @@ flowchart TB
     API --> AIService
 ```
 
+The "Middleware" is deliberately not drawn as its own business-logic tier: the
+Fastify endpoints, sync push/pull, and rule listener are thin code that reads
+and writes the Data Layer — they don't hold decision logic themselves. The
+actual logic (what counts as low stock, what's a valid substitute, when to
+notify) lives as **data** inside Postgres/Neo4j (the `rules` table + its
+Cypher), so the backend process can be redeployed, scaled, or replaced without
+touching business behaviour.
+
+
 ## Where pgvector is actually used (query-time mapping)
 
 The vector index only ever answers one question: **which single `products` row is
 this free-text question about?** It never decides rule outcomes or substitute
 validity — those stay in normal SQL/Cypher lookups against curated data.
 
+Matching is keyword-first, embeddings as fallback: catalog names are short and
+near-duplicates (e.g. "Whole Milk 1L" vs "Oat Milk 1L"), which the embedding of
+a *full question sentence* doesn't reliably tell apart — that mismatch used to
+make "alternative to whole milk?" resolve to Oat Milk 1L (no substitute of its
+own), so the answer was always "no known alternative". A question is now
+checked against product names directly first (majority of a name's words must
+appear in the question); embeddings only run when no product name is clearly
+present.
+
 ```mermaid
 sequenceDiagram
     participant Assoc as Associate (voice or text)
     participant Whisper as whisper.cpp
+    participant PG as Postgres (products)
     participant Embed as Ollama (embeddings)
     participant PGV as Postgres + pgvector
     participant Graph as Neo4j
@@ -69,24 +85,58 @@ sequenceDiagram
 
     Assoc->>Whisper: recorded audio (voice) or raw text
     Whisper-->>Assoc: transcript, e.g. "is there a similar product to whole milk?"
-    Assoc->>Embed: embed(transcript)
-    Embed-->>PGV: question embedding (768-dim vector)
-    PGV->>PGV: ORDER BY embedding <=> $question LIMIT 1
-    PGV-->>Assoc: likelyProduct = the nearest products row\n(e.g. "Whole Milk 1L")
-    Assoc->>PGV: SELECT * FROM substitutes WHERE product_id = likelyProduct.id
-    Assoc->>Graph: Cypher: products stocked at this store
-    PGV-->>LLM: likelyProduct + substitutes (structured facts)
-    Graph-->>LLM: graphFacts (structured facts)
-    LLM-->>Assoc: one natural-language sentence, composed only from\nthe facts above (never invents a substitute)
+    Assoc->>PG: keyword match against all product names
+    alt a product name clearly appears in the question
+        PG-->>Assoc: likelyProduct = that products row
+    else no clear name match (vaguer question)
+        Assoc->>Embed: embed(transcript)
+        Embed-->>PGV: question embedding (768-dim vector)
+        PGV->>PGV: ORDER BY embedding <=> $question LIMIT 1
+        PGV-->>Assoc: likelyProduct = the nearest products row
+    end
+    Assoc->>PG: SELECT * FROM substitutes WHERE product_id = likelyProduct.id
+    Assoc->>Graph: Cypher: which stores stock likelyProduct (all stores, not just this one)
+    PG-->>LLM: likelyProduct + substitutes (structured facts)
+    Graph-->>LLM: otherStoresInStock, pre-filtered to exclude the\nassociate's own store and out-of-stock shelves
+    LLM-->>Assoc: one natural-language sentence, composed only from\nthe facts above (never invents a substitute or a store)
     Assoc->>Piper: synthesize(answer)
     Piper-->>Assoc: spoken reply
 ```
 
 So a text/voice utterance is never mapped to an "intent" or a "rule" — it is
-mapped to **exactly one row in the `products` table**, chosen by nearest-neighbor
-distance between the question's embedding and that product's stored embedding.
-Everything downstream (substitutes, stock-at-this-store) is a plain lookup keyed
-off that one product id; the LLM only turns already-decided facts into a sentence.
+mapped to **exactly one row in the `products` table**, chosen by keyword match
+first and nearest-neighbor embedding distance as a fallback. Everything
+downstream (substitutes, cross-store stock) is a plain lookup keyed off that
+one product id; the LLM only turns already-decided facts into a sentence — and
+the "is it available elsewhere" filtering (excluding the current store and
+empty shelves) is done in code, not left for the LLM to reason about, since a
+small local model reasoned about that comparison unreliably.
+
+## Two paths that answer similar-sounding questions
+
+"Is there an alternative product?" and "is there another store that still has
+it?" are each answered by **two different mechanisms**, not one — which one
+runs depends on how the question arose, not on its wording:
+
+| Question | Triggered by | Mechanism | Vector search? | LLM? | Code |
+|---|---|---|---|---|---|
+| Suggest a substitute | Associate reports an ordered item's shelf empty | Rule `suggest_substitute_on_empty`: pure Cypher match on `(:Product)-[:SUBSTITUTE_FOR]->(:Product)`, gated by `Customer.alternativeOkIfEmpty` | No | No | [engine.ts](../backend/src/rules/engine.ts) `runAction('suggest_substitute', ...)` |
+| Is there another store with stock? | Same shelf-empty event | Rule `suggest_other_store_on_empty`: pure Cypher match across all stores | No | No | [engine.ts](../backend/src/rules/engine.ts) `runAction('suggest_other_store', ...)` |
+| "Is there something similar to X?" / "is it available somewhere else?" (typed/spoken) | Associate asks the assistant a free-text question | RAG: keyword match (embeddings as fallback) → `substitutes` table + cross-store stock lookup → LLM phrases the answer | Yes (only as a fallback to find *which* product) | Yes (only to phrase the sentence) | [assistant.ts](../backend/src/routes/assistant.ts) `answerQuestion()` |
+
+The first two rows are the ones behind the shelf-action screen's inline
+suggestion and the proactive agent's Yes/No bubble — fully deterministic,
+no model involved anywhere, retriggerable and auditable via `rule_firings`.
+
+The third row is the only one that is actually RAG: retrieval (pgvector +
+plain SQL/Cypher lookups) happens first and is never skipped, then the LLM
+is handed only that retrieved data to phrase into a sentence — it cannot
+answer from its own knowledge.
+
+The assistant's free-text path also answers "is there another store with
+this?" directly now: its Cypher looks up `likelyProduct`'s stock across *all*
+stores, and the current store plus any empty shelves are filtered out before
+the list ever reaches the LLM.
 
 ## Live graph sync & rule-firing loop
 
@@ -138,16 +188,16 @@ a graph database. Neo4j is used anyway, deliberately, for three reasons:
    whole graph from Postgres at any time with zero data loss.
 3. **It's the direct analogue of a real SAP capability.** This maps 1:1 to
    HANA's Graph Engine sitting alongside its relational tables in the same
-   database — the interview point isn't "Neo4j is required," it's "business
-   rules expressed as graph patterns over live-synced data, stored as data
-   (the `rules` table) instead of hardcoded `if` statements, so a rule change
-   is a Rules Admin edit, not a redeploy."
+   database. Neo4j isn't required for just 4 rules — the point is that
+   business rules are expressed as graph patterns over live-synced data,
+   stored as data (the `rules` table) instead of hardcoded `if` statements,
+   so a rule change is a Rules Admin edit, not a redeploy.
 
-If asked directly: *"for exactly these 4 rules, SQL would work fine — Neo4j
-earns its place once relationship depth/variability grows, and as a clean
-separation between transactional writes and read-side reasoning."*
+For exactly these 4 rules, plain SQL would work fine — Neo4j earns its place
+once relationship depth/variability grows, and as a clean separation between
+transactional writes and read-side reasoning.
 
-## Production-replacement mapping (for interview slides)
+## Production-replacement mapping
 
 | Demo component (now) | OSS production alternative | SAP / enterprise alternative |
 |---|---|---|

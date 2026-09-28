@@ -37,7 +37,8 @@ $$ LANGUAGE plpgsql;
 CREATE TABLE stores (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  code text UNIQUE NOT NULL
+  code text UNIQUE NOT NULL,
+  address text
 );
 
 -- Products (Mock: SAP Material Master) ---------------------------------------
@@ -124,7 +125,7 @@ CREATE TRIGGER trg_order_items_notify AFTER INSERT OR UPDATE ON order_items
 -- Notifications ---------------------------------------------------------------
 CREATE TABLE notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  role text NOT NULL CHECK (role IN ('associate', 'manager')),
+  role text NOT NULL CHECK (role IN ('associate', 'manager', 'customer')),
   type text NOT NULL,
   payload jsonb NOT NULL DEFAULT '{}',
   read_at timestamptz,

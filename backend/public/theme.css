@@ -1,0 +1,100 @@
+/* Shared SAP-inspired look for the demo admin pages (index, rules, simulator, qrcodes). */
+:root {
+  --sap-blue: #0070ad;
+  --sap-blue-dark: #004e80;
+  --sap-gold: #f0ab00;
+  --sap-bg: #f5f7fa;
+  --sap-surface: #ffffff;
+  --sap-border: #dbe1e8;
+  --sap-text: #1a1a1a;
+  --sap-muted: #667085;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  max-width: 800px;
+  margin: 0 auto 40px;
+  padding: 0 16px;
+  background: var(--sap-bg);
+  color: var(--sap-text);
+}
+
+.brandbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--sap-blue);
+  color: #fff;
+  margin: 0 -16px 24px;
+  padding: 12px 16px;
+}
+
+.brandbar .badge {
+  background: #fff;
+  color: var(--sap-blue);
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.85em;
+}
+
+.brandbar .title {
+  font-weight: 500;
+}
+
+h1 { font-size: 1.3em; }
+
+a { color: var(--sap-blue); }
+
+a.back { display: inline-block; margin-bottom: 8px; color: var(--sap-muted); text-decoration: none; }
+a.back:hover { color: var(--sap-blue); }
+
+a.card {
+  display: block;
+  background: var(--sap-surface);
+  border: 1px solid var(--sap-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+a.card:hover { border-color: var(--sap-blue); }
+
+table { width: 100%; border-collapse: collapse; margin-bottom: 24px; background: var(--sap-surface); }
+th, td { border-bottom: 1px solid var(--sap-border); padding: 8px; text-align: left; font-size: 0.9em; }
+th { color: var(--sap-muted); font-weight: 600; }
+
+label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.9em; }
+input, textarea, select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px;
+  font-family: monospace;
+  border: 1px solid var(--sap-border);
+  border-radius: 4px;
+}
+textarea { height: 70px; }
+
+button {
+  margin-top: 14px;
+  padding: 8px 16px;
+  background: var(--sap-blue);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover { background: var(--sap-blue-dark); }
+
+#status { margin-top: 10px; font-size: 0.9em; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-top: 16px; }
+.card { border: 1px solid var(--sap-border); background: var(--sap-surface); border-radius: 8px; padding: 12px; text-align: center; }
+.card img { width: 100%; height: auto; }
+.card .label { font-weight: 600; margin-top: 8px; font-size: 0.9em; }
+.card .meta { color: var(--sap-muted); font-size: 0.8em; }
+
+#result { margin-top: 16px; white-space: pre-wrap; background: var(--sap-surface); border: 1px solid var(--sap-border); padding: 12px; border-radius: 6px; font-family: monospace; font-size: 0.85em; }

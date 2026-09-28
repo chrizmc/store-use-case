@@ -65,8 +65,14 @@ interface ApiService {
         @Query("store_id") storeId: String? = null,
     ): SyncPullResponse
 
+    @POST("notifications")
+    suspend fun createNotification(@Body body: CreateNotificationRequest): AppNotification
+
     @POST("assistant/query")
     suspend fun assistantQuery(@Body body: AssistantQueryRequest): AssistantResponse
+
+    @POST("assistant/speak")
+    suspend fun assistantSpeak(@Body body: SpeakRequest): SpeakResponse
 
     @Multipart
     @POST("assistant/voice")

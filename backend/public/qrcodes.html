@@ -3,18 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <title>Shelf QR Codes</title>
-  <style>
-    body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 16px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-top: 16px; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; text-align: center; }
-    .card img { width: 100%; height: auto; }
-    .card .label { font-weight: 600; margin-top: 8px; font-size: 0.9em; }
-    .card .meta { color: #666; font-size: 0.8em; }
-    a { color: #06c; }
-  </style>
+  <link rel="stylesheet" href="/theme.css" />
 </head>
 <body>
-  <p><a href="/index.html">&larr; back</a></p>
+  <div class="brandbar"><span class="badge">SAP</span><span class="title">BOPIS Demo Admin</span></div>
+  <a class="back" href="/index.html">&larr; back</a>
   <h1>Shelf QR Codes</h1>
   <p>Printable/downloadable QR codes for every shelf &mdash; also useful for testing the
      Android app's <strong>Upload QR photo</strong> option (screenshot or save one of these,
@@ -22,22 +15,30 @@
   <div class="grid" id="grid"></div>
 
   <script>
+    // Mirrors backend/scripts/generateQrCodes.ts's fileNameFor(): filenames are the store
+    // code + product name, not the cryptic qr_code, so the right one is easy to spot by eye.
+    function fileNameFor(storeCode, productName) {
+      return `${storeCode} - ${productName}`.replace(/[/\\:*?"<>|]/g, '-').trim();
+    }
+
     async function load() {
       const [shelves, stores] = await Promise.all([
         fetch('/shelves').then((r) => r.json()),
         fetch('/stores').then((r) => r.json()),
       ]);
-      const storeNames = Object.fromEntries(stores.map((s) => [s.id, s.name]));
+      const storesById = Object.fromEntries(stores.map((s) => [s.id, s]));
       const grid = document.getElementById('grid');
       grid.innerHTML = shelves
-        .map(
-          (s) => `<div class="card">
-            <img src="/qrcodes/${s.qr_code}.png" alt="${s.qr_code}" />
+        .map((s) => {
+          const store = storesById[s.store_id];
+          const name = fileNameFor(store?.code ?? s.store_id, s.product_name);
+          return `<div class="card">
+            <img src="/qrcodes/${encodeURIComponent(name)}.png" alt="${name}" />
             <div class="label">${s.product_name}</div>
-            <div class="meta">${storeNames[s.store_id] ?? s.store_id} &middot; aisle ${s.aisle ?? '-'}</div>
-            <div class="meta"><a href="/qrcodes/${s.qr_code}.png" download>${s.qr_code}.png</a></div>
-          </div>`
-        )
+            <div class="meta">${store?.name ?? s.store_id} &middot; aisle ${s.aisle ?? '-'}</div>
+            <div class="meta"><a href="/qrcodes/${encodeURIComponent(name)}.png" download>${name}.png</a></div>
+          </div>`;
+        })
         .join('');
     }
     load();

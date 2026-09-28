@@ -1,9 +1,9 @@
 -- Mock SAP seed data. Each block states which real SAP system it stands in for.
 
 -- Mock: SAP Site/Store Master (replaces S/4HANA Site/Store Master)
-INSERT INTO stores (id, name, code) VALUES
-  ('11111111-1111-1111-1111-111111111111', 'Downtown Supermarket', 'ST01'),
-  ('22222222-2222-2222-2222-222222222222', 'Uptown Supermarket', 'ST02');
+INSERT INTO stores (id, name, code, address) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'Downtown Supermarket', 'ST01', '100 Market Street, Downtown'),
+  ('22222222-2222-2222-2222-222222222222', 'Uptown Supermarket', 'ST02', '55 Hilltop Avenue, Uptown');
 
 -- Mock: SAP Material Master (replaces S/4HANA Material Master)
 INSERT INTO products (id, sku, name, description) VALUES

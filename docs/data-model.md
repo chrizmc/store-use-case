@@ -16,7 +16,7 @@ customers(id, name, alternative_ok_if_empty, last_order_at, version, updated_at)
 orders(id, customer_id, store_id, status[open|ready_for_pickup|completed], version, ...)
 order_items(id, order_id, product_id, status[pending|picked|substituted|unavailable],
             substituted_with_product_id, version, updated_at)
-notifications(id, role[associate|manager], type, payload jsonb, read_at, version, created_at)
+notifications(id, role[associate|manager|customer], type, payload jsonb, read_at, version, created_at)
 rules(id, name, trigger_table, cypher_query, action_type, action_params jsonb, enabled)
 rule_firings(id, rule_id, entity_id, entity_version)      -- idempotency for rule evaluation
 sync_outbox(id, device_id, entity, entity_id, op, payload, idempotency_key)

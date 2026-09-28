@@ -19,8 +19,10 @@ INSERT INTO rules (name, description, trigger_table, cypher_query, action_type, 
   'MATCH (oi:OrderItem {id: $entityId})-[:FOR_PRODUCT]->(p:Product)-[:STOCKED_AT]->(s:Shelf)
    MATCH (oi)-[:ORDERED_BY]->(c:Customer {alternativeOkIfEmpty: true})
    WHERE s.status = "empty"
+   MATCH (s)-[:LOCATED_IN]->(st:Store)
    MATCH (p)-[r:SUBSTITUTE_FOR]->(sub:Product)
-   RETURN sub.id AS substituteId ORDER BY r.score DESC LIMIT 1',
+   MATCH (sub)-[:STOCKED_AT]->(subShelf:Shelf)-[:LOCATED_IN]->(st)
+   RETURN sub.id AS substituteId, sub.name AS substituteName, subShelf.aisle AS aisle ORDER BY r.score DESC LIMIT 1',
   'suggest_substitute',
   '{}'
 );
@@ -46,7 +48,7 @@ INSERT INTO rules (name, description, trigger_table, cypher_query, action_type, 
   'MATCH (p:Product)-[:STOCKED_AT]->(s:Shelf {id: $entityId}) WHERE s.status = "empty"
    MATCH (p)-[:STOCKED_AT]->(s2:Shelf)-[:LOCATED_IN]->(st2:Store)
    WHERE s2.id <> s.id AND s2.status <> "empty"
-   RETURN st2.name AS storeName, s2.qty AS qty ORDER BY s2.qty DESC LIMIT 1',
+   RETURN st2.name AS storeName, st2.address AS storeAddress, s2.qty AS qty ORDER BY s2.qty DESC LIMIT 1',
   'suggest_other_store',
   '{}'
 );

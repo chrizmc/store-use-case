@@ -24,7 +24,8 @@
     "fastify": "^4.28.1",
     "neo4j-driver": "^5.24.0",
     "pg": "^8.12.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@types/node": "^22.5.0",

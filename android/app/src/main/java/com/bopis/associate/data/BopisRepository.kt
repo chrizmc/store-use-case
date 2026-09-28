@@ -6,10 +6,12 @@ import com.bopis.associate.data.local.PendingActionEntity
 import com.bopis.associate.data.remote.ApiService
 import com.bopis.associate.data.remote.AssistantQueryRequest
 import com.bopis.associate.data.remote.AssistantResponse
+import com.bopis.associate.data.remote.CreateNotificationRequest
 import com.bopis.associate.data.remote.OrderDetail
 import com.bopis.associate.data.remote.OrderSummary
 import com.bopis.associate.data.remote.Shelf
 import com.bopis.associate.data.remote.ShelfReportRequest
+import com.bopis.associate.data.remote.SpeakRequest
 import com.bopis.associate.data.remote.SubstituteCandidate
 import com.bopis.associate.data.remote.SubstituteRequest
 import com.bopis.associate.data.remote.SyncPullResponse
@@ -148,6 +150,25 @@ class BopisRepository(
 
     suspend fun assistantQuery(question: String, storeId: String): AssistantResponse =
         api.assistantQuery(AssistantQueryRequest(question, storeId))
+
+    // Fire-and-forget, associate-facing (shows up in the Alerts "Sent" tab); failure is silent
+    // since it's just an informational note, not something worth queuing for offline retry.
+    suspend fun notifyAssociate(type: String, message: String) {
+        try {
+            api.createNotification(CreateNotificationRequest(role = "associate", type = type, payload = mapOf("message" to message)))
+        } catch (e: IOException) {
+            // best-effort
+        }
+    }
+
+    // Used only by the proactive agent to speak its Yes/No prompts; failures are silent
+    // (falls back to text-only) since speech is a nice-to-have, not the source of truth.
+    suspend fun assistantSpeak(text: String): String? =
+        try {
+            api.assistantSpeak(SpeakRequest(text)).audioBase64
+        } catch (e: IOException) {
+            null
+        }
 
     suspend fun assistantVoice(audio: okhttp3.MultipartBody.Part, storeId: okhttp3.RequestBody): AssistantResponse =
         api.assistantVoice(audio, storeId)

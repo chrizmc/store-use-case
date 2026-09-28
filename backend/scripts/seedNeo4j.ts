@@ -9,9 +9,9 @@ import { syncEntityToNeo4j } from '../src/rules/graphSync.js';
 // listener) is running, those pg_notify events are lost and Neo4j never mirrors them.
 // Safe to re-run any time (idempotent MERGE-only), e.g. after wiping Neo4j's data directory.
 async function main() {
-  const stores = await query('SELECT id, name FROM stores');
+  const stores = await query('SELECT id, name, address FROM stores');
   for (const s of stores) {
-    await runCypher('MERGE (st:Store {id: $id}) SET st.name = $name', s);
+    await runCypher('MERGE (st:Store {id: $id}) SET st.name = $name, st.address = $address', s);
   }
 
   const products = await query('SELECT id, sku, name FROM products');
@@ -30,11 +30,11 @@ async function main() {
     );
   }
 
-  const shelves = await query('SELECT id, store_id, product_id, qr_code FROM shelves');
+  const shelves = await query('SELECT id, store_id, product_id, qr_code, aisle FROM shelves');
   for (const sh of shelves) {
     await runCypher(
       `MATCH (p:Product {id: $product_id}), (st:Store {id: $store_id})
-       MERGE (s:Shelf {id: $id}) SET s.qrCode = $qr_code
+       MERGE (s:Shelf {id: $id}) SET s.qrCode = $qr_code, s.aisle = $aisle
        MERGE (p)-[:STOCKED_AT]->(s)
        MERGE (s)-[:LOCATED_IN]->(st)`,
       sh

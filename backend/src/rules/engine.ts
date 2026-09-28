@@ -65,7 +65,12 @@ async function runAction(
     if (!updated) return;
     await query(
       "INSERT INTO notifications (role, type, payload) VALUES ('associate', 'substitute_suggested', $1)",
-      [JSON.stringify({ orderItemId: entityId, substituteId })]
+      [JSON.stringify({
+        orderItemId: entityId,
+        substituteId,
+        substituteName: first?.substituteName,
+        aisle: first?.aisle,
+      })]
     );
   }
 
@@ -81,7 +86,12 @@ async function runAction(
     if (!storeName) return;
     await query(
       "INSERT INTO notifications (role, type, payload) VALUES ('associate', 'available_at_other_store', $1)",
-      [JSON.stringify({ shelfId: entityId, storeName, qty: first?.qty })]
+      [JSON.stringify({
+        shelfId: entityId,
+        storeName,
+        storeAddress: first?.storeAddress,
+        qty: first?.qty,
+      })]
     );
   }
 }

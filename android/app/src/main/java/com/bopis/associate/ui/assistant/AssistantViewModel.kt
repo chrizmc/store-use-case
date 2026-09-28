@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.util.Base64
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -17,17 +18,16 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
+// One exchange in the chat window: what the associate asked (typed, or transcribed from
+// voice) and the assistant's answer.
+data class ChatTurn(val question: String, val transcript: String?, val answer: String?)
+
 class AssistantViewModel(
     private val repository: BopisRepository,
     private val context: Context,
 ) : ViewModel() {
     var question by mutableStateOf("")
-    var answer by mutableStateOf<String?>(null)
-        private set
-    // What whisper.cpp actually transcribed, shown as-is so mistranscriptions are visible
-    // (as opposed to a wrong-sounding answer that was really just a bad answer, not bad STT).
-    var transcript by mutableStateOf<String?>(null)
-        private set
+    val turns = mutableStateListOf<ChatTurn>()
     var isRecording by mutableStateOf(false)
         private set
     var isBusy by mutableStateOf(false)
@@ -39,17 +39,17 @@ class AssistantViewModel(
     fun askText() {
         val q = question
         if (q.isBlank()) return
-        transcript = null
+        question = ""
         viewModelScope.launch {
             isBusy = true
-            answer = repository.assistantQuery(q, Constants.STORE_ID).answer
+            val answer = repository.assistantQuery(q, Constants.STORE_ID).answer
+            turns.add(ChatTurn(q, transcript = null, answer = answer))
             isBusy = false
         }
     }
 
     fun startRecording() {
         isRecording = true
-        transcript = null
         recorder.start(recordingFile)
     }
 
@@ -63,9 +63,7 @@ class AssistantViewModel(
             )
             val storeIdPart = Constants.STORE_ID.toRequestBody("text/plain".toMediaType())
             val response = repository.assistantVoice(audioPart, storeIdPart)
-            transcript = response.question
-            question = response.question ?: question
-            answer = response.answer
+            turns.add(ChatTurn(response.question ?: question, response.question, response.answer))
             response.audioBase64?.let { playAnswerAudio(it) }
             isBusy = false
         }
@@ -82,3 +80,4 @@ class AssistantViewModel(
         }
     }
 }
+
